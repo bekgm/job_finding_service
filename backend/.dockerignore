@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.env
+.venv
+venv
+uploads/
+.git
+.gitignore
+alembic/versions/*.py
+!alembic/versions/__init__.py
