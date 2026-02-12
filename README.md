@@ -1,10 +1,10 @@
-# 🧑‍💼 Job Board Platform
+# Job Board Platform
 
 A production-ready full-stack **Job Board** web application built with **FastAPI** (backend) and **React** (frontend). Employers can post job listings and manage applications, while candidates can browse jobs, apply with resumes, and track their application status.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#-features)
 - [Tech Stack](#-tech-stack)
@@ -19,7 +19,7 @@ A production-ready full-stack **Job Board** web application built with **FastAPI
 
 ---
 
-## ✨ Features
+##  Features
 
 ### Authentication & Authorization
 - JWT-based authentication (access + refresh tokens)
@@ -94,7 +94,7 @@ A production-ready full-stack **Job Board** web application built with **FastAPI
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 ├── backend/
@@ -141,7 +141,7 @@ A production-ready full-stack **Job Board** web application built with **FastAPI
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -202,7 +202,7 @@ docker-compose down -v
 
 ---
 
-## 📡 API Endpoints
+##  API Endpoints
 
 ### Auth (`/api/auth`)
 | Method | Endpoint | Description | Auth |
@@ -238,7 +238,7 @@ docker-compose down -v
 | GET | `/api/applications/jobs/{id}` | Applications for a job | Employer (owner) |
 | PATCH | `/api/applications/{id}/status` | Update application status | Employer (owner) |
 
-> 📄 Full OpenAPI spec available in [`openapi.yml`](openapi.yml) — import into Postman for testing.
+>  Full OpenAPI spec available in [`openapi.yml`](openapi.yml) — import into Postman for testing.
 
 ---
 
