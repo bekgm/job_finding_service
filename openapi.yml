@@ -1,0 +1,912 @@
+openapi: 3.0.3
+info:
+  title: Job Board API
+  description: |
+    Full-stack Job Board platform API.
+
+    **Roles:** `candidate`, `employer`
+
+    **Auth flow:** Register → Login (get tokens) → Use `access_token` as Bearer token.
+
+    Employer can create a company, post jobs, and manage applications.
+    Candidate can browse jobs, apply with resume, and track application status.
+  version: 1.0.0
+  contact:
+    name: Bekzat
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local Docker
+
+tags:
+  - name: Auth
+    description: Registration, login, token refresh, current user
+  - name: Companies
+    description: Company CRUD (employer-only for create/update)
+  - name: Jobs
+    description: Job listings — public browse + employer management
+  - name: Applications
+    description: Apply to jobs (candidate) & manage applications (employer)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── Enums ──────────────────────────────────
+    UserRole:
+      type: string
+      enum: [candidate, employer]
+
+    JobType:
+      type: string
+      enum: [full_time, part_time, contract, internship]
+
+    ApplicationStatus:
+      type: string
+      enum: [pending, reviewed, shortlisted, rejected, accepted]
+
+    # ── Auth ───────────────────────────────────
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name]
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          example: MyStr0ng!Pass
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: John Doe
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          example: MyStr0ng!Pass
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Company ────────────────────────────────
+    CompanyCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Acme Corp
+        description:
+          type: string
+          nullable: true
+          example: Leading tech company
+        website:
+          type: string
+          nullable: true
+          example: https://acme.com
+        location:
+          type: string
+          nullable: true
+          example: Almaty, KZ
+
+    CompanyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+
+    CompanyResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        owner_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Job ────────────────────────────────────
+    JobCreate:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Senior Backend Developer
+        description:
+          type: string
+          minLength: 1
+          example: We are looking for an experienced backend developer...
+        location:
+          type: string
+          nullable: true
+          example: Astana, KZ
+        is_remote:
+          type: boolean
+          default: false
+        job_type:
+          $ref: "#/components/schemas/JobType"
+        salary_min:
+          type: integer
+          nullable: true
+          example: 3000
+        salary_max:
+          type: integer
+          nullable: true
+          example: 6000
+
+    JobUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        location:
+          type: string
+          nullable: true
+        is_remote:
+          type: boolean
+        job_type:
+          $ref: "#/components/schemas/JobType"
+        salary_min:
+          type: integer
+          nullable: true
+        salary_max:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+
+    JobResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+          nullable: true
+        is_remote:
+          type: boolean
+        job_type:
+          $ref: "#/components/schemas/JobType"
+        salary_min:
+          type: integer
+          nullable: true
+        salary_max:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        company_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    JobDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/JobResponse"
+        - type: object
+          properties:
+            company:
+              $ref: "#/components/schemas/CompanyResponse"
+
+    PaginatedJobList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobDetailResponse"
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        pages:
+          type: integer
+          example: 3
+
+    # ── Application ────────────────────────────
+    ApplicationStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+
+    ApplicationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        candidate_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        cover_letter:
+          type: string
+          nullable: true
+        resume_path:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ApplicationDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApplicationResponse"
+        - type: object
+          properties:
+            candidate_name:
+              type: string
+              nullable: true
+            job_title:
+              type: string
+              nullable: true
+
+    # ── Error ──────────────────────────────────
+    HTTPError:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: Not found
+
+paths:
+  # ═══════════════════════════════════════════════
+  #  AUTH
+  # ═══════════════════════════════════════════════
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register a new user
+      description: Creates a new candidate or employer account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              candidate:
+                summary: Register as candidate
+                value:
+                  email: candidate@example.com
+                  password: Test1234!
+                  full_name: Jane Candidate
+                  role: candidate
+              employer:
+                summary: Register as employer
+                value:
+                  email: employer@example.com
+                  password: Test1234!
+                  full_name: Bob Employer
+                  role: employer
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPError"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Login
+      description: Returns access + refresh JWT tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: candidate@example.com
+              password: Test1234!
+      responses:
+        "200":
+          description: Tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPError"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Refresh access token
+      description: Exchange a valid refresh token for a new token pair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPError"
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: Get current user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPError"
+
+  # ═══════════════════════════════════════════════
+  #  COMPANIES
+  # ═══════════════════════════════════════════════
+  /companies:
+    post:
+      tags: [Companies]
+      operationId: createCompany
+      summary: Create a company (employer only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyCreate"
+            example:
+              name: Acme Corp
+              description: Leading tech company in Central Asia
+              website: https://acme.com
+              location: Almaty, KZ
+      responses:
+        "201":
+          description: Company created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not an employer
+        "409":
+          description: Employer already has a company
+
+  /companies/me:
+    get:
+      tags: [Companies]
+      operationId: getMyCompany
+      summary: Get my company
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: The employer's company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: No company found
+
+    patch:
+      tags: [Companies]
+      operationId: updateMyCompany
+      summary: Update my company (employer only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyUpdate"
+            example:
+              description: Updated description for our company
+              location: Astana, KZ
+      responses:
+        "200":
+          description: Company updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not an employer
+
+  /companies/{company_id}:
+    get:
+      tags: [Companies]
+      operationId: getCompany
+      summary: Get a company by ID
+      parameters:
+        - name: company_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Company details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyResponse"
+        "404":
+          description: Company not found
+
+  # ═══════════════════════════════════════════════
+  #  JOBS
+  # ═══════════════════════════════════════════════
+  /jobs:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      summary: List & filter jobs (public)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: search
+          in: query
+          description: Search in title and description
+          schema:
+            type: string
+        - name: is_remote
+          in: query
+          schema:
+            type: boolean
+        - name: job_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/JobType"
+        - name: salary_min
+          in: query
+          schema:
+            type: integer
+        - name: salary_max
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated job list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedJobList"
+
+    post:
+      tags: [Jobs]
+      operationId: createJob
+      summary: Create a job (employer only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobCreate"
+            example:
+              title: Senior Backend Developer
+              description: We need an experienced Python/FastAPI developer to join our team.
+              location: Almaty, KZ
+              is_remote: true
+              job_type: full_time
+              salary_min: 3000
+              salary_max: 6000
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not an employer / no company
+        "404":
+          description: Employer has no company
+
+  /jobs/employer/my-jobs:
+    get:
+      tags: [Jobs]
+      operationId: listMyJobs
+      summary: List my posted jobs (employer only)
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of jobs posted by this employer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not an employer
+
+  /jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Get job details (public)
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job detail with company info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetailResponse"
+        "404":
+          description: Job not found
+
+    patch:
+      tags: [Jobs]
+      operationId: updateJob
+      summary: Update a job (employer only, owner)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobUpdate"
+            example:
+              salary_max: 7000
+              is_active: false
+      responses:
+        "200":
+          description: Job updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not the job owner
+        "404":
+          description: Job not found
+
+    delete:
+      tags: [Jobs]
+      operationId: deleteJob
+      summary: Delete a job (employer only, owner)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Job deleted
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not the job owner
+        "404":
+          description: Job not found
+
+  # ═══════════════════════════════════════════════
+  #  APPLICATIONS
+  # ═══════════════════════════════════════════════
+  /applications/jobs/{job_id}/apply:
+    post:
+      tags: [Applications]
+      operationId: applyToJob
+      summary: Apply to a job (candidate only)
+      description: Submit an application with optional cover letter and resume (PDF).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                cover_letter:
+                  type: string
+                  description: Optional cover letter text
+                  example: I am excited to apply for this position...
+                resume:
+                  type: string
+                  format: binary
+                  description: Optional PDF resume file
+      responses:
+        "201":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResponse"
+        "400":
+          description: Already applied to this job
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not a candidate
+        "404":
+          description: Job not found
+
+  /applications/me:
+    get:
+      tags: [Applications]
+      operationId: getMyApplications
+      summary: My applications (candidate only)
+      description: Returns all applications submitted by the current candidate.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of applications with job title
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicationDetailResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not a candidate
+
+  /applications/jobs/{job_id}:
+    get:
+      tags: [Applications]
+      operationId: getJobApplications
+      summary: View applications for a job (employer only)
+      description: Returns all applications for a specific job owned by the employer.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of applications with candidate name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicationDetailResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not the job owner
+
+  /applications/{application_id}/status:
+    patch:
+      tags: [Applications]
+      operationId: updateApplicationStatus
+      summary: Update application status (employer only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: application_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationStatusUpdate"
+            examples:
+              shortlist:
+                summary: Shortlist candidate
+                value:
+                  status: shortlisted
+              reject:
+                summary: Reject candidate
+                value:
+                  status: rejected
+              accept:
+                summary: Accept candidate
+                value:
+                  status: accepted
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Not the job owner
+        "404":
+          description: Application not found
